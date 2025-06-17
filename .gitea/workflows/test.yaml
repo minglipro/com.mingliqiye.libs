@@ -1,0 +1,9 @@
+name: test
+run-name: test
+on: [ push ]
+
+jobs:
+  Explore-Gitea-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🎉hello world"
