@@ -1,0 +1,102 @@
+import java.security.MessageDigest
+
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+String jarName = "${groups}-${versions}.jar"
+
+group = groups
+version = versions
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupditer'
+    //implementation 'com.squareup.okhttp3:okhttp:5.0.0-alpha.16'
+    //implementation 'com.alibaba.fastjson2:fastjson2:2.0.57'
+    compileOnly 'org.projectlombok:lombok:1.18.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.36'
+    implementation 'net.java.dev.jna:jna-platform:5.17.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+shadowJar {
+    archiveFileName = jarName
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    minimize()
+    manifest {
+        attributes 'Main-Class': maimClassStr
+        attributes 'Implementation-Title': groups
+        attributes 'Implementation-Version': versions
+        attributes 'Email': 'minglipro@163.com'
+        attributes 'Implementation-Vendor': 'minglipro|Armamem0t'
+        attributes 'Copyright': copyright
+        attributes 'Env': 'prod'
+        attributes 'LICENSE': 'Apache License 2.0'
+        attributes 'Created': createdTime
+        attributes 'Updated': new Date().format('yyyy-MM-dd HH:mm:ss')
+    }
+    from 'LICENSE' into '.'
+    from {
+        project.configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+    exclude 'META-INF/**/*'
+
+}
+
+allprojects {
+    afterEvaluate {
+        println "${name}:配置完成"
+    }
+}
+
+ext.generateMD5 = { file, ads ->
+    MessageDigest md = MessageDigest.getInstance(ads)
+    file.eachByte(4096) { bytes, size ->
+        md.update(bytes, 0, size)
+    }
+    return md.digest().encodeHex().toString()
+}
+
+
+tasks.register('build-jar') {
+    delete fileTree("build/libs")
+    dependsOn tasks.named('shadowJar')
+    doLast {
+        Task shadowTask = tasks.named('shadowJar').get()
+        File outputFile = shadowTask.archiveFile.get().asFile
+        String path = outputFile.getParent()
+        String md5 = generateMD5(outputFile, "MD5")
+        String sha1 = generateMD5(outputFile, "SHA-1")
+        String sha256 = generateMD5(outputFile, "SHA-256")
+        File md5f = new File(path, jarName + ".MD5.txt")
+        File sha1f = new File(path, jarName + ".SHA1.txt")
+        File sha256f = new File(path, jarName + ".SHA256.txt")
+        md5f.text = md5
+        sha1f.text = sha1
+        sha256f.text = sha256
+        println ">>> 构建成功！"
+        println ">>> MD5: ${md5}"
+        println ">>> SHA1: ${sha1}"
+        println ">>> SHA256: ${sha256}"
+        println ">>> 输出文件: ${outputFile.absolutePath}"
+        println ">>> 输出文件: ${md5f.absolutePath}"
+        println ">>> 输出文件: ${sha1f.absolutePath}"
+        println ">>> 输出文件: ${sha256f.absolutePath}"
+        println ">>> 文件大小: ${outputFile.length() / 1024 / 1024} MB"
+    }
+}
+tasks.register("runJar", JavaExec){
+    classpath = files("build/libs/${jarName}")
+    mainClass = maimClassStr
+}
